@@ -18,11 +18,13 @@ package org.timconrad.vmstats;
 
 
 import java.io.File;
+import org.apache.commons.io.*;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+
 import java.rmi.RemoteException;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -47,7 +49,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class Main {
-
+	
+	private static String[] FilterArrays;
+	
 	public static void main(String[] args) {
 		
 		Logger logger = LoggerFactory.getLogger(Main.class);
@@ -56,6 +60,7 @@ public class Main {
 		Boolean showEstimate = false;
 		Boolean noThreads = false;
 		Boolean noGraphite = false;
+		
         
         File configFile = new File("vmstats.properties");
 		
@@ -162,7 +167,24 @@ public class Main {
 		String vcsUser = config.getProperty("VCS_USER");
 		String vcsPass = config.getProperty("VCS_PASS");
 		String vcsTag = config.getProperty("VCS_TAG");
-		List<String> statExcludes = Arrays.asList(config.getProperty("STAT_EXCLUDES").split(","));
+		String vcsFilter = config.getProperty("FILTERFILE");
+		
+		
+		
+		if (vcsFilter != null )
+		{
+		String filterfile = vcsFilter;
+        File FilterFile = new File(filterfile); 
+        List<String> FilterList = null;
+        try {
+        		FilterList = FileUtils.readLines(FilterFile);
+        	} catch (IOException e) 
+        	{
+				e.printStackTrace();
+        	}
+        
+		 	FilterArrays = FilterList.toArray(new String[]{});
+		}	
 
 		appConfig.put("vcsTag", vcsTag);
 		// vcs information
@@ -215,7 +237,7 @@ public class Main {
 		BlockingQueue<Object> esx_mob_queue = new ArrayBlockingQueue<Object>(10000);
 		// BlockingQueue to store arrays of stats - each managed object generates a bunch of strings that are stored in
 		BlockingQueue<Object> sender = new ArrayBlockingQueue<Object>(60000);
-		
+	
 		// Initialize these vmware types as nulls so we can see if things work properly
 		ServiceInstance si = null;
 		PerformanceManager perfMgr = null;
@@ -224,7 +246,7 @@ public class Main {
             // TODO: this doesn't handle some ASCII characters well, not sure why.
 			si = new ServiceInstance(new URL(vcsHost), vcsUser, vcsPass, true);
 		} catch (InvalidLogin e) {
-			logger.info("Invalid login vCenter: " + vcsHost + " User: " + vcsUser);
+			logger.info("Invalid login vCenter: " + vcsHost + " User: " + vcsUser );
 			System.exit(-1);
 		} catch (RemoteException e) {
 			logger.info("Remote exception: " + e);
@@ -241,13 +263,9 @@ public class Main {
 			// build a hash lookup to turn the counter 23 into 'disk.this.that.the.other'
 			// These are not sequential.
 			for(int i=0; i < counters.length; i++) {
-				String group = counters[i].getGroupInfo().getKey();
-				
-				if (statExcludes.contains(group)) continue;
-				
 				// create a temp hash to push onto the big hash
 				Hashtable<String,String> temp_hash = new Hashtable<String, String>();
-				String path = group + "." + counters[i].getNameInfo().getKey();
+				String path = counters[i].getGroupInfo().getKey() + "." + counters[i].getNameInfo().getKey();
                 // this is a key like cpu.run.0.summation
 				temp_hash.put("key", path);
                 // one of average, latest, maximum, minimum, none,  summation
@@ -304,19 +322,18 @@ public class Main {
                 }
 				
 				for(int i = 1; i <= MAX_VMSTAT_THREADS; i++ ) {
-					statsGrabber vm_stats_grabber = new statsGrabber(perfMgr, perfKeys, vm_mob_queue, sender, appConfig, "vm");
+					statsGrabber vm_stats_grabber = new statsGrabber(perfMgr, perfKeys, vm_mob_queue, sender, appConfig, "vm", FilterArrays);
 					ExecutorService vm_stat_exe = Executors.newCachedThreadPool();
 					vm_stat_exe.execute(vm_stats_grabber);
 				}
 
 				if(graphEsx.contains("true")) {
                     for(int i = 1; i <= MAX_ESXSTAT_THREADS; i++ ) {
-                        statsGrabber esx_stats_grabber = new statsGrabber(perfMgr, perfKeys, esx_mob_queue, sender, appConfig, "ESX");
+                        statsGrabber esx_stats_grabber = new statsGrabber(perfMgr, perfKeys, esx_mob_queue, sender, appConfig, "ESX", FilterArrays);
                         ExecutorService esx_stat_exe = Executors.newCachedThreadPool();
                         esx_stat_exe.execute(esx_stats_grabber);
                     }
-				}
-				
+				}			
 				
 			}else{
 				logger.info("Either ServiceInstance or PerformanceManager is null, bailing.");

@@ -49,20 +49,24 @@ class statsGrabber implements Runnable {
 	private final Hashtable<String, String> appConfig;
 	private String mobType = "bob";
     private volatile boolean cancelled;
+    private String[] ArrayFilters;
+
 	
 	private static final Logger logger = LoggerFactory.getLogger(statsGrabber.class);
 	
 	public statsGrabber(PerformanceManager perfMgr, Hashtable<String, Hashtable<String, String>> perfKeys,
-			BlockingQueue<Object> mob_queue, BlockingQueue<Object> sender, Hashtable<String, String> appConfig, String mobType) {
+			BlockingQueue<Object> mob_queue, BlockingQueue<Object> sender, Hashtable<String, String> appConfig, String mobType,String[] Filters) {
 		this.mob_queue = mob_queue;
 		this.sender = sender;
 		this.perfMgr = perfMgr;
 		this.perfKeys = perfKeys;
 		this.appConfig = appConfig;
 		this.mobType = mobType;
+		this.ArrayFilters = Filters;
 	}	
 	
 	private String[] getStats(Object[] info) {
+		Boolean matchkeys=true;
 		ManagedEntity managedEntity = (ManagedEntity)info[0];
 		String cluster = (String)info[1];
 		if (cluster.trim().equals(""))
@@ -138,14 +142,32 @@ class statsGrabber implements Runnable {
                     PerfEntityMetric pem = (PerfEntityMetric) pValue;
                     PerfMetricSeries[] vals = pem.getValue();
                     PerfSampleInfo[] infos = pem.getSampleInfo();
-
+                  
                     for (int x = 0; vals != null && x < vals.length; x++) {
+          
                         int counterId = vals[x].getId().getCounterId();
                         // create strings for the parts of the tag.
+                        String key = perfKeys.get("" + counterId).get("key");
+                        matchkeys=true;
+                    	
+                        if (this.ArrayFilters != null )
+                        {
+                        if (this.ArrayFilters.length > 0)
+                        {
+                        	matchkeys=false;
+                        	for (int i=0; i<=this.ArrayFilters.length -1; i++)
+                        	{
+                        		if (key.matches(this.ArrayFilters[i]) ) matchkeys = true;
+                   
+                        	               
+                        	}
+                        }}
+
+                        if (matchkeys == true)
+                        {
                         Hashtable<String, String> perfKey = perfKeys.get("" + counterId);
                         if (perfKey==null) 
                         	continue;
-                        String key = perfKey.get("key");
                         
                         String instance = vals[x].getId().getInstance();
                         // disks will be naa.12341234, change them to naa_12341234 instead
@@ -202,6 +224,7 @@ class statsGrabber implements Runnable {
                                         }
                                     }
                                 }
+                            }
                             }
                         }
                     }

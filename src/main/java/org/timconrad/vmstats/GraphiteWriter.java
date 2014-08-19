@@ -35,7 +35,7 @@ class GraphiteWriter implements Runnable{
     private boolean debugOutput = false;
 	public GraphiteWriter(String host, int port, BlockingQueue<Object> dumper,Hashtable<String, String> appConfig) {
 		// the constructor. construct things.
-		this.dumper = dumper;
+		this.dumper = dumper;  
 		this.host = host;
 		this.port = port;
         this.appConfig = appConfig;
