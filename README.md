@@ -22,6 +22,11 @@ Version History:
     - Upgraded to 5.0.1 version of vijava
     - Moved to github
 
+2.3
+	- Added Filter file
+
+
+
 Overview:
 This will log into your vCenter server, and get all performanceMetrics/stats for
 all of your virtual machines and ESX nodes. It will then do some manipulation
@@ -113,6 +118,11 @@ Notes:
 	the statistics every 60 seconds, and only for that interval. This means that
 	there are two intervals that are lost per 60 second interval. There will be
 	some work-around for this in a future version.
+
+	Filter file:
+
+	This file contains multiple line regex patterns, only matching strings from returned perf counters will be returned
+	^cpu.average will match the cpu.average metric and ^cpu.* will match all cpu metrics
 
 To Do:
     See TODO.txt
